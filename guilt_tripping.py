@@ -31,7 +31,7 @@ class GuiltTripping(MPServerAPI, MPVideoPad):
 		except Exception as e:
 			video_info = info['info']
 
-		self.db.set("video_%d" % info['index'], json.dumps(video_info))		
+		self.db.set("video_%d" % info['index'], json.dumps(video_info))
 		logging.info("VIDEO INFO UPDATED: %s" % self.db.get("video_%d" % info['index']))
 
 	def stop(self):
@@ -41,21 +41,25 @@ class GuiltTripping(MPServerAPI, MPVideoPad):
 		return self.stop_video_pad()
 
 	def play_main_voiceover(self):
-		self.play_video(self.main_video, video_callback=self.video_listener_callback)
+		self.db.set("audio_mode", "voiceover")
+		self.play_video(self.main_video, video_callback=self.video_listener_callback, with_extras={"loop":""})
 		return self.say(os.path.join("prompts", "guilt_tripping.wav"), interruptable=True)
+
+	def toggle_audio_mode(self):
+		if self.db.get("audio_mode") == "video":
+			if self.unpause() and self.mute_video(video_callback=self.video_callback):
+				self.db.set("audio_mode", "voiceover")
+				return True
+		else:
+			if self.pause() and self.unmute_video(video_callback=self.video_callback):
+				self.db.set("audio_mode", "video")
+				return True
+
+		return False
 
 	def press(self, key):
 		logging.debug("(press overridden.)")
-
-		try:
-			return self.pause() and \
-				self.unmute_video(self.main_video) and \
-				self.unpause() and \
-				self.mute_video(self.main_video)
-		except Exception as e:
-			print e, type(e)
-		
-		return False
+		return self.toggle_audio_mode()
 
 	def reset_for_call(self):
 		for video_mapping in self.video_mappings:
