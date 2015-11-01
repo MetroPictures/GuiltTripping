@@ -27,8 +27,9 @@ $(document).ready(function() {
 		var a = $(document.createElement('a'))
 			.html(html)
 			.click(function() {
+				var mapping = $($(this).find('.num')[0]).html();
 				$.ajax({
-					url : "mapping/3"
+					url : "mapping/" + mapping
 				}).done(function(json) {
 					console.info(json);
 				});

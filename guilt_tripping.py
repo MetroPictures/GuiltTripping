@@ -6,6 +6,15 @@ from core.vars import BASE_DIR
 from core.api import MPServerAPI
 from core.video_pad import MPVideoPad
 
+# Arbitrary at this point
+
+SQUARE = 0
+EQUAL = 1
+TRIANGLE = 2
+
+RECEIVER_CHANNEL = 0
+BODY_CHANNEL = 1
+
 class GuiltTripping(MPServerAPI, MPVideoPad):
 	def __init__(self):
 		MPServerAPI.__init__(self)
@@ -25,13 +34,19 @@ class GuiltTripping(MPServerAPI, MPVideoPad):
 		logging.basicConfig(filename=self.conf['d_files']['module']['log'], level=logging.DEBUG)
 
 	def video_listener_callback(self, info):
+		# if it's playing, mute it
+		print info
+		if 'start_time' in info['info'].keys():
+			print "FIRST PLAYING"
+			self.mute_video(video_callback=self.video_listener_callback)
+
 		try:
 			video_info = json.loads(self.db.get("video_%d" % info['index']))
 			video_info.update(info['info'])
 		except Exception as e:
 			video_info = info['info']
 
-		self.db.set("video_%d" % info['index'], json.dumps(video_info))
+		self.db.set("video_%d" % info['index'], json.dumps(video_info))		
 		logging.info("VIDEO INFO UPDATED: %s" % self.db.get("video_%d" % info['index']))
 
 	def stop(self):
@@ -41,29 +56,74 @@ class GuiltTripping(MPServerAPI, MPVideoPad):
 		return self.stop_video_pad()
 
 	def play_main_voiceover(self):
-		self.db.set("audio_mode", "voiceover")
-		self.play_video(self.main_video, video_callback=self.video_listener_callback, with_extras={"loop":""})
+		self.mute_channel(BODY_CHANNEL)
+		self.play_video(self.main_video, with_extras={'loop' : ""}, \
+			video_callback=self.video_listener_callback)
 		return self.say(os.path.join("prompts", "guilt_tripping.wav"), interruptable=True)
-
-	def toggle_audio_mode(self):
-		if self.db.get("audio_mode") == "video":
-			if self.unpause() and self.mute_video(video_callback=self.video_callback):
-				self.db.set("audio_mode", "voiceover")
-				return True
-		else:
-			if self.pause() and self.unmute_video(video_callback=self.video_callback):
-				self.db.set("audio_mode", "video")
-				return True
-
-		return False
 
 	def press(self, key):
 		logging.debug("(press overridden.)")
-		return self.toggle_audio_mode()
+		key = int(key) + 2
+
+		if key == SQUARE:
+			# voiceover chan 0 (body chan) unmuted
+			# voiceover chan 1 (receiver) muted
+			# video muted
+
+			if not self.unpause():
+				return False
+
+			if not self.mute_channel(RECEIVER_CHANNEL):
+				return False
+
+			sleep(0.25)
+			if not self.unmute_channel(BODY_CHANNEL):
+				return False
+
+			if not self.get_video_info(0)['muted']:
+				return self.mute_video(video=self.main_video, video_callback=self.video_listener_callback)
+
+			return True
+
+		if key == EQUAL:
+			# pause voiceover
+			# video unmuted
+
+			if not self.pause():
+				return False
+
+			if self.get_video_info(0)['muted']:
+				return self.unmute_video(video=self.main_video, video_callback=self.video_listener_callback)
+
+			return True
+
+		if key == TRIANGLE:
+			# voiceover chan 0 (body chan) muted
+			# voiceover chan 1 (receiver) unmuted
+			# video muted
+
+			if not self.unpause():
+				return False
+
+			if not self.mute_channel(BODY_CHANNEL):
+				return False
+
+			sleep(0.25)
+			if not self.unmute_channel(RECEIVER_CHANNEL):
+				return False
+
+			if not self.get_video_info(0)['muted']:
+				return self.mute_video(video=self.main_video, video_callback=self.video_listener_callback)
+
+			return True
+		
+		return False
 
 	def reset_for_call(self):
 		for video_mapping in self.video_mappings:
 			self.db.delete("video_%s" % video_mapping.index)
+
+		self.restore_audio()
 
 		super(GuiltTripping, self).reset_for_call()
 
