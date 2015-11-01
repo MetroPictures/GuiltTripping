@@ -38,7 +38,7 @@ class GuiltTripping(MPServerAPI, MPVideoPad):
 		print info
 		if 'start_time' in info['info'].keys():
 			print "FIRST PLAYING"
-			self.mute_video(video_callback=self.video_listener_callback)
+			info['info']['muted'] = True
 
 		try:
 			video_info = json.loads(self.db.get("video_%d" % info['index']))
@@ -57,7 +57,7 @@ class GuiltTripping(MPServerAPI, MPVideoPad):
 
 	def play_main_voiceover(self):
 		self.mute_channel(BODY_CHANNEL)
-		self.play_video(self.main_video, with_extras={'loop' : ""}, \
+		self.play_video(self.main_video, with_extras={'loop' : "", 'vol' : "-6000"}, \
 			video_callback=self.video_listener_callback)
 		return self.say(os.path.join("prompts", "guilt_tripping.wav"), interruptable=True)
 
